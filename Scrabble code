@@ -1,0 +1,189 @@
+import random
+
+# ===========================
+# CONSTANTES
+# ===========================
+TAILLE_PLATEAU = 15      # plateau 15x15
+JOKER = '?'              # symbole du joker
+
+# ===========================
+# PARTIE 1 — PLATEAU (Q1→Q5)
+# ===========================
+
+def symetrise_liste(lst):
+    """Auxiliaire : symétrise en place la liste lst (utilisé par init_bonus)."""
+    copie_lst = []
+    i = 0
+    while i < len(lst):
+        copie_lst.append(lst[i])
+        i += 1
+    i = len(copie_lst) - 2   # on ne répète pas l'élément central
+    while i >= 0:
+        lst.append(copie_lst[i])
+        i -= 1
+
+def init_bonus():
+    """Q1. Initialise la grille des bonus (format officiel du sujet)."""
+    plt_bonus = [
+        ['MT', ''  , ''  , 'LD', ''  , ''  , ''  , 'MT'],
+        [''  , 'MD', ''  , ''  , ''  , 'LT', ''  , ''  ],
+        [''  , ''  , 'MD', ''  , ''  , ''  , 'LD', ''  ],
+        ['LD', ''  , ''  , 'MD', ''  , ''  , ''  , 'LD'],
+        [''  , ''  , ''  , ''  , 'MD', ''  , ''  , ''  ],
+        [''  , 'LT', ''  , ''  , ''  , 'LT', ''  , ''  ],
+        [''  , ''  , 'LD', ''  , ''  , ''  , 'LD', ''  ],
+        ['MT', ''  , ''  , 'LD', ''  , ''  , ''  , 'MD']
+    ]
+    r = 0
+    while r < len(plt_bonus):
+        symetrise_liste(plt_bonus[r])
+        r += 1
+    symetrise_liste(plt_bonus)   # symétrie verticale
+    return plt_bonus
+
+def init_jetons():
+    """Q2. Crée une grille 15x15 de chaînes vides. Chaque ligne est indépendante."""
+    jetons = []
+    i = 0
+    while i < TAILLE_PLATEAU:
+        ligne = []
+        j = 0
+        while j < TAILLE_PLATEAU:
+            ligne.append('')
+            j += 1
+        jetons.append(ligne)
+        i += 1
+    return jetons
+
+def affiche_jetons(jetons):
+    """Q3. Affiche le plateau de lettres (sans montrer les bonus)."""
+    n = len(jetons)
+    # entête colonnes
+    print("   ", end="")
+    j = 0
+    while j < n:
+        col = j + 1
+        if col < 10:
+            print("0" + str(col) + " ", end="")
+        else:
+            print(str(col) + " ", end="")
+        j += 1
+    print()
+    # séparation
+    print("   ", end="")
+    j = 0
+    while j < n:
+        print("|---", end="")
+        j += 1
+    print("|")
+    # lignes
+    i = 0
+    while i < n:
+        lig = i + 1
+        if lig < 10:
+            print("0" + str(lig) + " ", end="")
+        else:
+            print(str(lig) + " ", end="")
+        j = 0
+        while j < n:
+            case = jetons[i][j]
+            if case == "":
+                print("|   ", end="")
+            else:
+                print("| " + case[0] + " ", end="")
+            j += 1
+        print("|")
+        print("   ", end="")
+        j = 0
+        while j < n:
+            print("|---", end="")
+            j += 1
+        print("|")
+        i += 1
+
+def affiche_jetons_avec_bonus(jetons, bonus):
+    """Q4. Affiche plateau lettres + bonus.
+    Symboles : MD='*'  MT='#'  LD='+'  LT='='  (aucun=' ')"""
+    n = len(jetons)
+    print("   ", end="")
+    j = 0
+    while j < n:
+        col = j + 1
+        if col < 10:
+            print("0" + str(col) + "  ", end="")
+        else:
+            print(str(col) + "  ", end="")
+        j += 1
+    print()
+    print("   ", end="")
+    j = 0
+    while j < n:
+        print("|----", end="")
+        j += 1
+    print("|")
+    i = 0
+    while i < n:
+        lig = i + 1
+        if lig < 10:
+            print("0" + str(lig) + " ", end="")
+        else:
+            print(str(lig) + " ", end="")
+        j = 0
+        while j < n:
+            lettre = jetons[i][j]
+            b = bonus[i][j]
+            sym = ' '
+            if b == 'MD':
+                sym = '*'
+            elif b == 'MT':
+                sym = '#'
+            elif b == 'LD':
+                sym = '+'
+            elif b == 'LT':
+                sym = '='
+            if lettre == "":
+                print("|  " + sym + " ", end="")
+            else:
+                print("| " + lettre[0] + sym + " ", end="")
+            j += 1
+        print("|")
+        print("   ", end="")
+        j = 0
+        while j < n:
+            print("|----", end="")
+            j += 1
+        print("|")
+        i += 1
+
+# ===========================
+# PARTIE 2 — PIOCHE (Q7→Q11)
+# ===========================
+
+def init_pioche_alea():
+    """Q7. Pioche aléatoire : 100 lettres A..Z + 2 jokers. Au moins 1 occurrence de chaque lettre."""
+    sac = []
+    c = ord('A')
+    while c <= ord('Z'):
+        sac.append(chr(c))
+        c += 1
+    while len(sac) < 100:
+        lettre = chr(ord('A') + random.randint(0, 25))
+        sac.append(lettre)
+    sac.append(JOKER)
+    sac.append(JOKER)
+    random.shuffle(sac)
+    return sac
+
+def piocher(x, sac):
+    """Q8. Pioche x jetons au hasard dans sac. Modifie sac et retourne la liste piochée."""
+    res = []
+    nb = x
+    if nb > len(sac):
+        nb = len(sac)
+    i = 0
+    while i < nb:
+        idx = random.randint(0, len(sac) - 1)
+        jet = sac.pop(idx)
+        res.append(jet)
+        i += 1
+    return res
