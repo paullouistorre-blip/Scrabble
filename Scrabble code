@@ -187,3 +187,517 @@ def piocher(x, sac):
         res.append(jet)
         i += 1
     return res
+def completer_main(main, sac):
+    """Q9. Complète la main à 7 jetons (effets de bord)."""
+    nb = 7 - len(main)
+    if nb > 0:
+        nouveaux = piocher(nb, sac)
+        i = 0
+        while i < len(nouveaux):
+            main.append(nouveaux[i])
+            i += 1
+
+def echanger(jetons, main, sac):
+    """Q10. Échange les jetons listés depuis la main avec le sac. Retourne True/False."""
+    # présence des jetons dans la main
+    i = 0
+    while i < len(jetons):
+        j = jetons[i]
+        present = False
+        k = 0
+        while k < len(main):
+            if main[k] == j:
+                present = True
+                break
+            k += 1
+        if not present:
+            return False
+        i += 1
+    # assez de jetons dans le sac
+    if len(sac) < len(jetons):
+        return False
+    # retirer de la main (une occurrence par jeton listé)
+    defausse = []
+    i = 0
+    while i < len(jetons):
+        j = jetons[i]
+        k = 0
+        retire = False
+        while k < len(main) and not retire:
+            if main[k] == j:
+                defausse.append(main.pop(k))
+                retire = True
+            else:
+                k += 1
+        i += 1
+    # piocher autant de nouveaux jetons
+    nouveaux = piocher(len(defausse), sac)
+    i = 0
+    while i < len(nouveaux):
+        main.append(nouveveaux[i] if False else nouveaux[i])  # évite astuce, garde simple
+        i += 1
+    # remettre la défausse dans le sac
+    i = 0
+    while i < len(defausse):
+        sac.append(defausse[i])
+        i += 1
+    return True
+
+# ===============================
+# PARTIE 3 — CONSTRUCTION (Q12→Q17)
+# ===============================
+
+def generer_dictfr(nf='littre.txt'):
+    """Q12. Lecture de tous les mots (majuscules, non accentués)."""
+    mots = []
+    try:
+        f = open(nf, 'r', encoding='utf-8')
+        for ligne in f:
+            mot = ligne.strip().upper()
+            if mot != "":
+                mots.append(mot)
+        f.close()
+    except FileNotFoundError:
+        # mini fallback pour tests (Q12–Q17 seulement, pas utilisé pour Q19–Q21)
+        mots = ["COURIR", "PIED", "DEPIT", "TAPIR", "MARCHER", "SCRABBLE", "BONJOUR"]
+    return mots
+
+def select_mot_initiale(motsfr, let):
+    """Q13. Tous les mots commençant par let."""
+    res = []
+    i = 0
+    while i < len(motsfr):
+        mot = motsfr[i]
+        if len(mot) > 0 and mot[0] == let:
+            res.append(mot)
+        i += 1
+    return res
+
+def select_mot_longueur(motsfr, lgr):
+    """Q14. Tous les mots de longueur lgr."""
+    res = []
+    i = 0
+    while i < len(motsfr):
+        mot = motsfr[i]
+        if len(mot) == lgr:
+            res.append(mot)
+        i += 1
+    return res
+
+def mot_jouable(mot, ll):
+    """Q15 (+ Q17). Vrai si mot peut être écrit avec les lettres de ll (joker '?' remplace n'importe quoi).
+    Ne modifie PAS ll (on travaille sur une copie).
+    """
+    dispo = []
+    i = 0
+    while i < len(ll):
+        dispo.append(ll[i])
+        i += 1
+    i = 0
+    while i < len(mot):
+        ch = mot[i]
+        k = 0
+        trouve = False
+        while k < len(dispo) and not trouve:
+            if dispo[k] == ch:
+                dispo.pop(k)
+                trouve = True
+            else:
+                k += 1
+        if not trouve:
+            k = 0
+            utilise_joker = False
+            while k < len(dispo) and not utilise_joker:
+                if dispo[k] == JOKER:
+                    dispo.pop(k)
+                    utilise_joker = True
+                else:
+                    k += 1
+            if not utilise_joker:
+                return False
+        i += 1
+    return True
+
+def mots_jouables(motsfr, ll):
+    """Q16 (+ Q17). Tous les mots jouables avec ll."""
+    res = []
+    i = 0
+    while i < len(motsfr):
+        mot = motsfr[i]
+        if mot_jouable(mot, ll):
+            res.append(mot)
+        i += 1
+    return res
+
+# ====================================
+# PARTIE 4 — DICO LETTRES & PIOCHE (Q19→Q21)
+# ====================================
+
+def generer_dico():
+    """Q19. Dictionnaire des lettres intégré (équivalent à lettres.txt).
+    Renvoie le format attendu : { 'A': {'occ': 9, 'val': 1}, ... }."""
+    contenu = """
+A;  1;  9
+B;  3;  2
+C;  3;  2
+D;  2;  3
+E;  1; 15
+F;  4;  2
+G;  2;  2
+H;  4;  2
+I;  1;  8
+J;  8;  1
+K; 10;  1
+L;  1;  5
+M;  2;  3
+N;  1;  6
+O;  1;  6
+P;  3;  2
+Q;  8;  1
+R;  1;  6
+S;  1;  6
+T;  1;  6
+U;  1;  6
+V;  4;  2
+W; 10;  1
+X; 10;  1
+Y; 10;  1
+Z; 10;  1
+?;  0;  2
+""".strip()
+
+    dico = {}
+    lignes = contenu.split("\n")
+    i = 0
+    while i < len(lignes):
+        lig = lignes[i]
+        parts = lig.split(";")
+        l = parts[0].strip()
+        v = int(parts[1].strip())
+        o = int(parts[2].strip())
+        dico[l] = {"val": v, "occ": o}
+        i += 1
+    return dico
+
+def init_pioche(dico):
+    """Q20. Construit la pioche officielle à partir du dico (occurrences)."""
+    sac = []
+    for lettre in dico:
+        nb = dico[lettre]['occ']
+        i = 0
+        while i < nb:
+            sac.append(lettre)
+            i += 1
+    random.shuffle(sac)
+    return sac
+
+# =========================================
+# PARTIE 5 — VALEUR & JEU TEXTE (Q22→Q28)
+# =========================================
+
+def valeur_mot(mot, dico):
+    # Q22 — somme valeurs + bonus Scrabble (7 lettres)
+    total = 0
+    i = 0
+    while i < len(mot):
+        ch = mot[i]
+        if ch in dico:
+            total += dico[ch]['val']
+        i += 1
+    if len(mot) == 7:
+        total += 50
+    return total
+
+def meilleur_mot(motsfr, ll, dico):
+    # Q23 — meilleur mot jouable selon valeur_mot ; "" si aucun
+    meilleurscore = -1
+    meilleur = ""
+    i = 0
+    while i < len(motsfr):
+        mot = motsfr[i]
+        if mot_jouable(mot, ll):
+            sc = valeur_mot(mot, dico)
+            if sc > meilleurscore:
+                meilleurscore = sc
+                meilleur = mot
+        i += 1
+    return meilleur
+
+def meilleurs_mots(motsfr, ll, dico):
+    # Q24 — tous les meilleurs (ex aequo). [] si aucun.
+    meilleurscore = -1
+    res = []
+    i = 0
+    while i < len(motsfr):
+        mot = motsfr[i]
+        if mot_jouable(mot, ll):
+            sc = valeur_mot(mot, dico)
+            if sc > meilleurscore:
+                meilleurscore = sc
+                res = [mot]
+            elif sc == meilleurscore:
+                res.append(mot)
+        i += 1
+    if meilleurscore < 0:
+        return []
+    return res
+
+# --- Aides Q25–Q28 (jeu sans placement, cf énoncé) ---
+
+def a_plus_assez_pour_completer(main, sac):
+    # Q26 — True si le joueur DOIT piocher mais le sac est insuffisant
+    manque = 7 - len(main)
+    if manque <= 0:
+        return False
+    return len(sac) < manque
+
+def consommateur_de_lettres(mot, main):
+    """
+    Retire dupliquées les lettres du mot depuis la main (utilise '?' si besoin).
+    Modifie main si possible et renvoie True ; sinon False (ne touche pas la main).
+    """
+    # Copie de travail
+    tmp = []
+    i = 0
+    while i < len(main):
+        tmp.append(main[i])
+        i += 1
+    # Tentative de consommation
+    i = 0
+    while i < len(mot):
+        ch = mot[i]
+        k = 0
+        pris = False
+        while k < len(tmp) and not pris:
+            if tmp[k] == ch:
+                tmp.pop(k)
+                pris = True
+            else:
+                k += 1
+        if not pris:
+            # essayer joker
+            k = 0
+            while k < len(tmp) and not pris:
+                if tmp[k] == JOKER:
+                    tmp.pop(k)
+                    pris = True
+                else:
+                    k += 1
+            if not pris:
+                return False
+        i += 1
+    # Appliquer sur la vraie main (on sait que c'est possible)
+    main[:] = tmp
+    return True
+
+def afficher_main(main):
+    # petite aide visuelle
+    print("Main:", main, "(taille:", len(main), ")")
+
+def tour_joueur(nom, main, sac, jetons, bonus, motsfr, dico):
+    """
+    Q25 — Gère un tour de joueur (sans placement) :
+      - options: (P)asser, (E)changer, (M)ot (proposer)
+      - calcule valeur, met à jour score local, défausse lettres, re-pioche
+      - retourne (score_delta, fin_partie_bool)
+    """
+    print("\n===== Tour de", nom, "=====")
+    affiche_jetons(jetons)
+    afficher_main(main)
+
+    # Choix
+    print("Choix : [P]asser / [E]changer / proposer un [M]ot")
+    choix = input("Votre choix (P/E/M) : ").strip().upper()
+    while choix not in ["P","E","M"]:
+        choix = input("Votre choix (P/E/M) : ").strip().upper()
+
+    # Passer
+    if choix == "P":
+        print("->", nom, "passe son tour.")
+        return 0, False
+
+    # Échanger
+    if choix == "E":
+        if len(sac) == 0:
+            print("-> Sac vide : échange impossible.")
+            return 0, False
+        afficher_main(main)
+        s = input("Liste des lettres à échanger (sans séparateur, ex: AEI) : ").strip().upper()
+        # transformer en liste
+        to_swap = []
+        i = 0
+        while i < len(s):
+            to_swap.append(s[i])
+            i += 1
+        ok = echanger(to_swap, main, sac)
+        if ok:
+            print("Échange réussi.")
+            afficher_main(main)
+        else:
+            print("Échange impossible (lettre absente ou sac insuffisant).")
+        return 0, False
+
+    # Proposer un mot
+    if choix == "M":
+        mot = input("Mot proposé (majuscules, sans accents) : ").strip().upper()
+        # filtrage (présent dans dico FR ?)
+        autorise = False
+        i = 0
+        while i < len(motsfr):
+            if motsfr[i] == mot:
+                autorise = True
+                break
+            i += 1
+        if not autorise:
+            print("Mot non autorisé (absent du dictionnaire).")
+            return 0, False
+        # jouable avec la main ?
+        if not mot_jouable(mot, main):
+            print("Mot non jouable avec votre main.")
+            return 0, False
+        # valeur
+        val = valeur_mot(mot, dico)
+        print("Valeur du mot:", mot, "=", val, "points")
+        # défausser les lettres correspondantes
+        ok = consommateur_de_lettres(mot, main)
+        if not ok:
+            print("Erreur: impossible de défausser les lettres (incohérence).")
+            return 0, False
+        # Fin de partie si sac insuffisant pour compléter
+        if a_plus_assez_pour_completer(main, sac):
+            print("Fin de partie: sac insuffisant pour compléter la main.")
+            return val, True
+        # sinon re-piocher pour revenir à 7
+        completer_main(main, sac)
+        afficher_main(main)
+        return val, False
+
+    return 0, False  # par sécurité
+
+def prochain_joueur_index(idx, nb):
+    # Q27 — joueur suivant circulaire
+    nxt = idx + 1
+    if nxt >= nb:
+        nxt = 0
+    return nxt
+
+def malus_main(main, dico):
+    # somme des valeurs résiduelles (pénalité fin de partie)
+    total = 0
+    i = 0
+    while i < len(main):
+        ch = main[i]
+        if ch in dico:
+            total += dico[ch]['val']
+        i += 1
+    return total
+
+
+# ===========================
+# PROGRAMME DE TEST (Q5, Q11, Q19→Q21)
+# ===========================
+
+if __name__ == '__main__':
+    print("=== Q1→Q5 : Plateau ===")
+    bonus = init_bonus()
+    jetons = init_jetons()
+    # placer une lettre de test
+    jetons[7][7] = 'A'
+    affiche_jetons(jetons)
+    print()
+    print("Affichage avec bonus (MD=*, MT=#, LD=+, LT==):")
+    affiche_jetons_avec_bonus(jetons, bonus)
+
+    print("\n=== Q7→Q11 : Pioche simple, mains, échange ===")
+    sac = init_pioche_alea()
+    print("Taille sac (alea, 102 attendu) :", len(sac))
+    main1 = piocher(7, sac)
+    main2 = piocher(7, sac)
+    print("Main1:", main1)
+    print("Main2:", main2)
+    print("Sac restant:", len(sac))
+    if len(main1) >= 2:
+        ok = echanger([main1[0], main1[1]], main1, sac)
+        print("Échange OK ?", ok)
+        print("Nouvelle main1:", main1)
+        print("Sac restant:", len(sac))
+
+    print("\n=== Q19→Q21 : Dictionnaire & Pioche officielle ===")
+    dico = generer_dico()                     # Q19 : plus besoin du fichier
+    print("Occurrences de K :", dico['K']['occ'])
+    print("Valeur de Z :", dico['Z']['val'])
+    sac_off = init_pioche(dico)               # Q20
+    print("Taille sac officiel :", len(sac_off))
+    main1 = piocher(7, sac_off)               # Q21 : on remplace l’alea par l’officiel
+    main2 = piocher(7, sac_off)
+    print("Main1(off):", main1)
+    print("Main2(off):", main2)
+    print("Sac_off restant:", len(sac_off))
+    
+     # -------- Q28 : boucle de jeu à x joueurs (sans placement) --------
+    print("\n=== Q28 : Boucle de jeu multi-joueurs (sans placement) ===")
+    # joueurs
+    try:
+        nb_j = int(input("Nombre de joueurs ? "))
+        if nb_j < 1:
+            nb_j = 1
+    except:
+        nb_j = 2
+    joueurs = []
+    n = 0
+    while n < nb_j:
+        nom = input("Nom du joueur "+str(n+1)+" : ").strip()
+        if nom == "": nom = "J"+str(n+1)
+        joueurs.append({"nom": nom, "score": 0, "main": []})
+        n += 1
+
+    # distribuer les mains
+    i = 0
+    while i < nb_j:
+        joueurs[i]["main"] = piocher(7, sac)
+        i += 1
+
+    # dictionnaire de mots autorisés
+    motsfr = generer_dictfr()
+
+    # boucle
+    joueur_courant = 0
+    fin = False
+    while not fin:
+        j = joueurs[joueur_courant]
+        print("\n-------------------------------")
+        print("Scores actuels :")
+        t = 0
+        while t < nb_j:
+            print(" -", joueurs[t]["nom"], ":", joueurs[t]["score"])
+            t += 1
+        # tour de jeu
+        delta, fin = tour_joueur(j["nom"], j["main"], sac, jetons, bonus, motsfr, dico)
+        j["score"] += delta
+        # fin de partie ? pénalités
+        if fin:
+            print("\n=== Fin de partie (sac insuffisant pour compléter) ===")
+            # malus pour tous SAUF le joueur qui a déclenché (les autres joueurs perdent leurs lettres)
+            t = 0
+            while t < nb_j:
+                if t != joueur_courant:
+                    mal = malus_main(joueurs[t]["main"], dico)
+                    joueurs[t]["score"] -= mal
+                    print(joueurs[t]["nom"], "perd", mal, "points (lettres restantes)")
+                t += 1
+            break
+        # sinon joueur suivant
+        joueur_courant = prochain_joueur_index(joueur_courant, nb_j)
+
+    # résultats
+    print("\n=== Scores finaux ===")
+    t = 0
+    meilleur_nom = ""
+    meilleur_sc = -999999
+    while t < nb_j:
+        print(joueurs[t]["nom"], ":", joueurs[t]["score"])
+        if joueurs[t]["score"] > meilleur_sc:
+            meilleur_sc = joueurs[t]["score"]
+            meilleur_nom = joueurs[t]["nom"]
+        t += 1
+    print("Gagnant :", meilleur_nom, "avec", meilleur_sc, "points.")
