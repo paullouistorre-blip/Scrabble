@@ -398,55 +398,30 @@ def mots_jouables(motsfr, ll):
 
 # PARTIE 4 : DICO JETONS, PIOCHE & SCORE ##########################################
 
-def generer_dico(nf='lettres.txt'):
-    """
-    Q19) Charge le fichier des jetons (Lettre;Valeur;Occurrence).
+def generer_dico() :
+    """Dictionnaire des jetons.
+
+    >>> jetons = generer_dico()
+    >>> jetons['A'] == {'occ': 9, 'val': 1}
+    True
+    >>> jetons['B'] == jetons['C']
+    True
+    >>> jetons['?']['val'] == 0
+    True
+    >>> jetons['!']
+    Traceback (most recent call last):
+    KeyError: '!'
     """
     jetons = {}
-    try:
-        with open(nf, 'r', encoding='utf_8') as lettres:
-            for ligne in lettres:
-                # convert_str_maj_epspace
-                ligne_nouvelle = convert_str_maj_epspace(ligne)
-                if not ligne_nouvelle: continue 
-
-                # Découpage manuel de la ligne selon le séparateur ';'
-                parties = []
-                last_index = 0
-                i = 0
-                while i < len(ligne_nouvelle):
-                    if ligne_nouvelle[i] == ';':
-                        # Extraction de la sous-chaine
-                        partie_brut = ""
-                        j = last_index
-                        while j < i:
-                            partie_brut += ligne_nouvelle[j]
-                            j += 1
-                        parties.append(convert_str_maj_epspace(partie_brut)) 
-                        last_index = i + 1
-                    i += 1
-                
-                # Ajout de la dernière partie (après le dernier ;)
-                partie_brut = ""
-                j = last_index
-                while j < len(ligne_nouvelle):
-                    partie_brut += ligne_nouvelle[j]
-                    j += 1
-                parties.append(convert_str_maj_epspace(partie_brut))
-
-                # Si on a bien 3 éléments (Lettre, Valeur, Occurrence)
-                if len(parties) == 3:
-                    l = parties[0]
-                    v = int(parties[1]) # Conversion en entier
-                    o = int(parties[2])
-                    jetons[l] = {'occ': o, 'val': v}
-                    
-        print("INFO: Dictionnaire de jetons chargé depuis ", nf, ".")
-    except FileNotFoundError:
-        print("ERREUR CRITIQUE: Fichier jetons introuvable.")
-    except Exception as e:
-        print("ERREUR chargement jetons: ", e)
-        
+    # 'Path' nécessite l'import 'from pathlib import Path' en haut du fichier.
+    # .open(...) ouvre le fichier en lecture.
+    with Path('lettres.txt').open(encoding='utf_8') as lettres :
+        for ligne in lettres :
+            # .strip() enlève les espaces et sauts de ligne au début et à la fin.
+            # .split(';') coupe la ligne en morceaux à chaque ';'.
+            l, v, o = ligne.strip().split(';')
+            # On stocke dans le dictionnaire avec conversion en entier (int).
+            jetons[l] = {'occ': int(o), 'val': int(v)}
     return jetons
 
 def init_pioche(dico):
