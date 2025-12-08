@@ -427,13 +427,13 @@ def generer_dico() :
 def init_pioche(dico):
     """Q20) Construit le sac de pioche à partir des occurrences du dictionnaire."""
     sac = []
-    for lettre, donnees in dico.items():
-        # Ajout de la lettre 'occ' fois dans le sac
+    for lettre in dico:
+        donnees = dico[lettre]
         i = 0
+        # Ajout de la lettre 'occ' fois dans le sac
         while i < donnees['occ']:
             sac.append(lettre)
-            i += 1
-        
+            i += 1    
     # Mélange du sac (autorisé via import random)
     random.shuffle(sac) 
     return sac
@@ -659,7 +659,7 @@ def meilleure_aide_de_jeu(motsfr, main, dico):
     print("Mots trouvés (ex aequo):", meilleurs)
 
 
-# PROGRAMME PRINCIPAL (OBJECTIF Q28) ###########################################
+# PROGRAMME PRINCIPAL ###########################################
 
 if __name__ == '__main__':
     
@@ -682,11 +682,11 @@ if __name__ == '__main__':
         # --- 3. Configuration des joueurs ---
         try:
             nb_j_input = input("Nombre de joueurs (>=1) ? ")
-            nb_j_nettoye = convert_str_maj_epspace(nb_j_input)
+            nb_j_nouv = convert_str_maj_epspace(nb_j_input)
             nb_j = int(nb_j_nettoye)
             while nb_j < 1:
                 nb_j_input = input("Nombre de joueurs doit être >= 1. Réessayez : ")
-                nb_j_nettoye = convert_str_maj_epspace(nb_j_input)
+                nb_j_nouv = convert_str_maj_epspace(nb_j_input)
                 nb_j = int(nb_j_nettoye)
         except:
             nb_j = 1
