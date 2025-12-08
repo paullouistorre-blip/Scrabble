@@ -314,7 +314,8 @@ def echanger(jetons_a_echanger, main, sac):
 
     # On reconstruit la liste 'main' à partir du compteur mis à jour
     main_mise_a_jour = []
-    for jeton, count in compteur_main.items():
+    for jeton in compteur_main:
+        count = compteur_main[jeton] # Accès à la valeur
         i = 0
         while i < count:
             main_mise_a_jour.append(jeton)
