@@ -1,0 +1,983 @@
+#!/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+-----------------------------------------------------------------------------
+i11_XXXX_YYYY_projet.py : CR projet « scrabble », groupe ZZZ
+
+XXXX <prenom.nom@etu-univ-grenoble-alpes.fr>
+YYYY <prenom.nom@univ-grenoble-alpes.fr>
+-----------------------------------------------------------------------------
+"""
+
+# IMPORTS ######################################################################
+
+import random             # Nécessaire pour les fonctions de hasard (randint)
+from collections import Counter # Pour la gestion robuste des jetons (doublons/jokers)
+
+
+# CONSTANTES ###################################################################
+
+TAILLE_PLATEAU = 15     # taille du plateau de jeu
+
+JOKER = '?'             # symbole du joker
+FICHIER_DICO_FR = 'littre.txt'      # Fichier des mots français
+FICHIER_DICO_JETONS = 'lettres.txt' # Fichier des jetons, valeurs et occurrences
+
+# ⚠ pas de variable globales, sauf cas exceptionnel
+
+
+# FONCTIONS UTILITAIRES ACADEMIQUES ############################################
+
+def convert_str_maj_epspace(chaine):
+    """
+    Convertit la chaîne en majuscules et retire les espaces/retours à la ligne manuellement.
+    (Utilisé pour simuler .strip().upper() sur les inputs et fichiers).
+    """
+    res = ""
+    i = 0
+    # Suppression des espaces de tête
+    while i < len(chaine) and chaine[i] == ' ':
+        i += 1
+        
+    # Conversion et construction du corps
+    while i < len(chaine):
+        car = chaine[i]
+        
+        if 'a' <= car <= 'z':
+            car = chr(ord(car) - 32)
+        if car != '\n' and car != '\r':
+            res += car
+            
+        i += 1
+    
+    # Suppression des espaces de queue
+    while len(res) > 0 and res[-1] == ' ':
+        res = res[:-1]
+        
+    return res
+
+# PARTIE 1 : LE PLATEAU ########################################################
+
+def symetrise_liste(lst):
+    """
+    Auxilliaire pour Q1) : symétrise en place la liste lst.
+    EB : modification de lst.
+    """
+    copie_lst = list(lst)
+    for i in range(2, len(copie_lst)+1) : 
+        lst.append(copie_lst[-i])
+
+def init_bonus():
+    """Q1. Initialise la grille des bonus (format officiel du sujet)."""
+    plt_bonus = [
+        ['MT', ''  , ''  , 'LD', ''  , ''  , ''  , 'MT'],
+        [''  , 'MD', ''  , ''  , ''  , 'LT', ''  , ''  ],
+        [''  , ''  , 'MD', ''  , ''  , ''  , 'LD', ''  ],
+        ['LD', ''  , ''  , 'MD', ''  , ''  , ''  , 'LD'],
+        [''  , ''  , ''  , ''  , 'MD', ''  , ''  , ''  ],
+        [''  , 'LT', ''  , ''  , ''  , 'LT', ''  , ''  ],
+        [''  , ''  , 'LD', ''  , ''  , ''  , 'LD', ''  ],
+        ['MT', ''  , ''  , 'LD', ''  , ''  , ''  , 'MD']
+    ]
+    r = 0
+    while r < len(plt_bonus):
+        symetrise_liste(plt_bonus[r])
+        r += 1
+    symetrise_liste(plt_bonus)   # symétrie verticale
+    return plt_bonus
+
+def init_jetons():
+    """Q2. Crée une grille 15x15 de chaînes vides. Chaque ligne est indépendante."""
+    jetons = []
+    i = 0
+    while i < TAILLE_PLATEAU:
+        ligne = []
+        j = 0
+        while j < TAILLE_PLATEAU:
+            ligne.append('')
+            j += 1
+        jetons.append(ligne)
+        i += 1
+    return jetons
+
+def affiche_jetons(jetons):
+    n = len(jetons)
+
+    # En-tête colonnes (3 caractères par colonne : "01 ")
+    print("    ", end="")
+    j = 0
+    while j < n:
+        col = j + 1
+        if col < 10:
+            print("0" + str(col) + "  ", end="")   # "01 "
+        else:
+            print(str(col) + "  ", end="")         # "10 "
+        j += 1
+    print()
+
+    # Ligne de séparation : |--- pour chaque colonne
+    print("   ", end="")
+    j = 0
+    while j < n:
+        print("|---", end="")
+        j += 1
+    print("|")
+
+    # Lignes du plateau
+    i = 0
+    while i < n:
+        lig = i + 1
+        if lig < 10:
+            print("0" + str(lig) + " ", end="")
+        else:
+            print(str(lig) + " ", end="")
+
+        j = 0
+        while j < n:
+            c = jetons[i][j]
+            if c == "":
+                print("|   ", end="")       # 3 espaces de largeur
+            else:
+                print("| " + c[0] + " ", end="")
+            j += 1
+        print("|")
+
+        print("   ", end="")
+        j = 0
+        while j < n:
+            print("|---", end="")
+            j += 1
+        print("|")
+        i += 1
+
+def affiche_jetons_avec_bonus(jetons, bonus):
+    n = len(jetons)
+
+    # En-tête colonnes (4 caractères par colonne : "01  ")
+    print("     ", end="")
+    j = 0
+    while j < n:
+        col = j + 1
+        if col < 10:
+            print("0" + str(col) + "   ", end="")   # "01  "
+        else:
+            print(str(col) + "   ", end="")         # "10  "
+        j += 1
+    print()
+
+    # Séparateur : |---- pour chaque colonne
+    print("   ", end="")
+    j = 0
+    while j < n:
+        print("|----", end="")
+        j += 1
+    print("|")
+
+    # Lignes
+    i = 0
+    while i < n:
+        lig = i + 1
+        if lig < 10:
+            print("0" + str(lig) + " ", end="")
+        else:
+            print(str(lig) + " ", end="")
+
+        j = 0
+        while j < n:
+            lettre = jetons[i][j]
+            b = bonus[i][j]
+            sym = ' '
+            if b == 'MD':
+                sym = '*'
+            elif b == 'MT':
+                sym = '#'
+            elif b == 'LD':
+                sym = '+'
+            elif b == 'LT':
+                sym = '='
+
+            if lettre == "":
+                print("|  " + sym + " ", end="")        # "  * "
+            else:
+                print("| " + lettre[0] + sym + " ", end="")  # " A* "
+            j += 1
+        print("|")
+
+        print("   ", end="")
+        j = 0
+        while j < n:
+            print("|----", end="")
+            j += 1
+        print("|")
+        i += 1
+
+# PARTIE 2 : PIOCHE ############################################################
+
+def piocher(x, sac):
+    """
+    Q8) Pioche x jetons au hasard dans sac. Modifie sac et retourne la liste piochée.
+    Remplacement de random.sample par random.randint et del pour la conformité.
+    """
+    nb = min(x, len(sac))
+    jetons_pioches = []
+    
+    i = 0
+    while i < nb:
+        if len(sac) > 0:
+            # random.randint(a, b) inclut b
+            index_aleatoire = random.randint(0, len(sac) - 1) 
+            
+            jeton = sac[index_aleatoire]
+            jetons_pioches.append(jeton)
+            
+            # Utilisation de del maliste[index] (méthode de suppression listée dans le poly)
+            del sac[index_aleatoire] 
+            
+        i += 1
+        
+    return jetons_pioches
+
+def completer_main(main, sac):
+    """
+    Q9) Complète la main à 7 jetons (effets de bord).
+    Remplacement de list.extend par une boucle for/append.
+    """
+    nb_manquant = 7 - len(main)
+    if nb_manquant > 0:
+        nouveaux = piocher(nb_manquant, sac)
+        # Remplacement de main.extend(nouveaux) par for/append
+        for jeton in nouveaux:
+            main.append(jeton) 
+
+def echanger(jetons_a_echanger, main, sac):
+    """
+    Q10) Échange les jetons listés depuis la main avec le sac.
+    Utilisation de dictionnaire manuel pour remplacer collections.Counter.
+    """
+    if len(sac) < len(jetons_a_echanger):
+        return False
+        
+    # Remplacement de Counter par dictionnaire manuel
+    compteur_main = {}
+    for jeton in main:
+        compteur_main[jeton] = compteur_main.get(jeton, 0) + 1
+
+    compteur_requis = {}
+    for jeton in jetons_a_echanger:
+        compteur_requis[jeton] = compteur_requis.get(jeton, 0) + 1
+        
+    # 1. Vérification que la main contient toutes les lettres requises
+    for jeton in compteur_requis: 
+        if compteur_main.get(jeton, 0) < compteur_requis[jeton]:
+            return False 
+
+    # 2. Défausse et échange
+    
+    # Mettre à jour le compteur de la main
+    for jeton in jetons_a_echanger:
+        compteur_main[jeton] -= 1
+
+    # Reconstruire la main mise à jour
+    main_mise_a_jour = []
+    for jeton, count in compteur_main.items():
+        i = 0
+        while i < count:
+            main_mise_a_jour.append(jeton)
+            i += 1
+            
+    # Modification par effet de bord
+    main[:] = main_mise_a_jour
+
+    # Ajout des jetons échangés au sac
+    for jeton in jetons_a_echanger:
+        sac.append(jeton)
+        
+    # Piocher les nouveaux jetons
+    nouveaux = piocher(len(jetons_a_echanger), sac)
+    for jeton in nouveaux:
+        main.append(jeton)
+    
+    return True
+
+# PARTIE 3 : CONSTRUCTIONS DE MOTS #############################################
+
+def generer_dictfr(nf=FICHIER_DICO_FR) :
+    """
+    Q12) Liste des mots Français en majuscules sans accent.
+    Utilisation de open() natif et nettoyage manuel de chaque ligne.
+    """
+    mots = []
+    try:
+        with open(nf, 'r', encoding='utf_8') as fich_mots :
+            for line in fich_mots :
+                # Nettoyage et conversion en majuscules manuelle (conformité stricte)
+                res = convert_str_maj_epspace(line)
+                if len(res) > 0:
+                    mots.append(res)
+                    
+        print("INFO: ", len(mots), " mots chargés depuis ", nf, ".")
+    except FileNotFoundError:
+        temp_dico_name = 'littre (1).txt'
+        try:
+            with open(temp_dico_name, 'r', encoding='utf_8') as fich_mots :
+                for line in fich_mots :
+                    res = convert_str_maj_epspace(line)
+                    if len(res) > 0:
+                        mots.append(res)
+            print("INFO: ", len(mots), " mots chargés depuis ", temp_dico_name, ".")
+        except FileNotFoundError:
+            print("ERREUR CRITIQUE: Le fichier dictionnaire '", nf, "' (ni son alternative) est introuvable. Les mots jouables seront limités.")
+        except Exception as e:
+            print("ERREUR lors du chargement de ", temp_dico_name, ": ", e)
+    except Exception as e:
+        print("ERREUR lors du chargement de ", nf, ": ", e)
+        
+    return mots
+
+def select_mot_initiale(motsfr, let):
+    """
+    Q13) Tous les mots commençant par let.
+    Remplacement de .startswith par l'indexation [0] (conforme).
+    """
+    res = []
+    for mot in motsfr:
+        if len(mot) > 0 and mot[0] == let:
+            res.append(mot)
+    return res
+
+def select_mot_longueur(motsfr, lgr):
+    """Q14) Tous les mots de longueur lgr."""
+    return [mot for mot in motsfr if len(mot) == lgr]
+
+def mot_jouable(mot, ll):
+    """
+    Q15/Q17) Vrai si mot peut être écrit avec les lettres de ll (joker '?').
+    Remplacement de collections.Counter par dictionnaire manuel.
+    """
+    # Remplacement de Counter(ll) par un dictionnaire manuel
+    dispo = {}
+    for jeton in ll:
+        dispo[jeton] = dispo.get(jeton, 0) + 1
+        
+    for ch in mot:
+        if dispo.get(ch, 0) > 0:
+            dispo[ch] -= 1
+        elif dispo.get(JOKER, 0) > 0:
+            dispo[JOKER] -= 1
+        else:
+            return False
+            
+    return True
+
+def mots_jouables(motsfr, ll):
+    """Q16/Q17) Tous les mots jouables avec ll."""
+    return [mot for mot in motsfr if mot_jouable(mot, ll)]
+
+
+# PARTIE 4 : DICO JETONS, PIOCHE & SCORE ##########################################
+
+def generer_dico(nf=FICHIER_DICO_JETONS):
+    """
+    Q19) Dictionnaire des jetons (lettres.txt).
+    Parsing manuel sans .split().
+    """
+    jetons = {}
+    try:
+        with open(nf, 'r', encoding='utf_8') as lettres:
+            for ligne in lettres:
+                # La logique de nettoyage est intégrée ici pour le fichier
+                ligne_nettoyee = convert_str_maj_epspace(ligne)
+                if not ligne_nettoyee: continue 
+
+                # Parsing manuel (Remplacement de .split(';'))
+                parties = []
+                last_index = 0
+                
+                i = 0
+                while i < len(ligne_nettoyee):
+                    if ligne_nettoyee[i] == ';':
+                        partie_brut = ""
+                        j = last_index
+                        while j < i:
+                            partie_brut += ligne_nettoyee[j]
+                            j += 1
+                        # Nettoyage de la partie (pour retirer les espaces superflus dans le fichier)
+                        parties.append(convert_str_maj_epspace(partie_brut)) 
+                        last_index = i + 1
+                    i += 1
+                
+                # Ajouter la dernière partie
+                partie_brut = ""
+                j = last_index
+                while j < len(ligne_nettoyee):
+                    partie_brut += ligne_nettoyee[j]
+                    j += 1
+                parties.append(convert_str_maj_epspace(partie_brut))
+
+                # Traitement des parties
+                if len(parties) == 3:
+                    l = parties[0]
+                    v = int(parties[1])
+                    o = int(parties[2])
+                    jetons[l] = {'occ': o, 'val': v}
+                    
+        print("INFO: Dictionnaire de jetons chargé depuis ", nf, ".")
+    except FileNotFoundError:
+        print("ERREUR CRITIQUE: Le fichier des jetons '", nf, "' est introuvable. Impossible d'initialiser la partie.")
+    except Exception as e:
+        print("ERREUR lors du chargement de ", nf, ": ", e)
+        
+    return jetons
+
+def init_pioche(dico):
+    """Q20) Construit la pioche officielle à partir du dico (occurrences)."""
+    sac = []
+    for lettre, donnees in dico.items():
+        # Utilisation d'une boucle while au lieu de .extend
+        i = 0
+        while i < donnees['occ']:
+            sac.append(lettre)
+            i += 1
+        
+    random.shuffle(sac) 
+    return sac
+
+def valeur_mot(mot, dico):
+    """Q22) Somme des valeurs + bonus Scrabble (50 pts si 7 lettres)."""
+    total = 0
+    for ch in mot:
+        # Structure conforme if/in/crochets
+        if ch in dico:
+            total += dico[ch]['val']
+        else:
+            total += 0
+    
+    if len(mot) == 7:
+        total += 50
+    return total
+
+def meilleur_mot(motsfr, ll, dico):
+    """Q23) Meilleur mot jouable selon valeur_mot ; "" si aucun."""
+    meilleur_score = -1
+    meilleur = ""
+    
+    for mot in motsfr:
+        if mot_jouable(mot, ll):
+            sc = valeur_mot(mot, dico)
+            if sc > meilleur_score:
+                meilleur_score = sc
+                meilleur = mot
+                
+    return meilleur
+
+def meilleurs_mots(motsfr, ll, dico):
+    """Q24) Tous les meilleurs mots (ex aequo). [] si aucun."""
+    res = []
+    meilleur_score = -1
+    
+    for mot in motsfr:
+        if mot_jouable(mot, ll):
+            sc = valeur_mot(mot, dico)
+            if sc > meilleur_score:
+                meilleur_score = sc
+                res = [mot] 
+            elif sc == meilleur_score:
+                res.append(mot) 
+                
+    return res if meilleur_score >= 0 else []
+
+
+# PARTIE 5 : GESTION DU JEU TEXTE ##############################################
+
+def consommateur_de_lettres(mot, main):
+    """
+    Q23 (utilitaire) : Retire dupliquées les lettres du mot depuis la main (utilise '?').
+    Remplacement de collections.Counter par dictionnaire manuel.
+    """
+    
+    # Création du compteur manuel
+    compteur_tmp = {}
+    for jeton in main:
+        compteur_tmp[jeton] = compteur_tmp.get(jeton, 0) + 1
+    
+    # 1. Vérification si jouable (simulation de la consommation)
+    verif_compteur = dict(compteur_tmp) 
+    
+    for ch in mot:
+        if verif_compteur.get(ch, 0) > 0:
+            verif_compteur[ch] -= 1
+        elif verif_compteur.get(JOKER, 0) > 0:
+            verif_compteur[JOKER] -= 1
+        else:
+            return False 
+
+    # 2. Modification de la main
+    main_mise_a_jour = []
+    
+    # Soustraire les jetons utilisés
+    compteur_a_conserver = dict(compteur_tmp)
+    for ch in mot:
+        if compteur_a_conserver.get(ch, 0) > 0:
+            compteur_a_conserver[ch] -= 1
+        elif compteur_a_conserver.get(JOKER, 0) > 0:
+            compteur_a_conserver[JOKER] -= 1
+            
+    # Reconstruire la main
+    for jeton, count in compteur_a_conserver.items():
+        i = 0
+        while i < count:
+            main_mise_a_jour.append(jeton)
+            i += 1
+            
+    # Modification par effet de bord (main[:] = ...)
+    main[:] = main_mise_a_jour
+    return True
+
+def a_plus_assez_pour_completer(main, sac):
+    """Q26) True si le joueur DOIT piocher mais le sac est insuffisant."""
+    manque = 7 - len(main)
+    return manque > 0 and len(sac) < manque
+
+def afficher_main(main):
+    """Affiche la main de manière lisible."""
+    print("Main:", main, "(taille:", len(main), ")")
+
+def prochain_joueur_index(idx, nb):
+    """Q27) Indice du joueur suivant (tour circulaire)."""
+    return (idx + 1) % nb
+
+def malus_main(main, dico):
+    """
+    Q27) Somme des valeurs résiduelles (pénalité fin de partie).
+    Remplacement de dico.get(...) par la structure if/in/crochets conforme.
+    """
+    total = 0
+    for ch in main:
+        if ch in dico:
+            total += dico[ch]['val']
+        else:
+            total += 0
+    return total
+
+def plateau_est_vide(plateau):
+    """Vérifie si aucune lettre n'est encore posée sur le plateau."""
+    for i in range(TAILLE_PLATEAU):
+        for j in range(TAILLE_PLATEAU):
+            if plateau[i][j] != '':
+                return False
+    return True
+
+# PARTIE 6 : PLACEMENT ET JEU COMPLET ##########################################
+
+def est_sur_plateau(lig, col):
+    """Q29 (Auxiliaire) : Vérifie si les coordonnées (0-indexées) sont sur le plateau (15x15)."""
+    return lig >= 0 and lig < TAILLE_PLATEAU and col >= 0 and col < TAILLE_PLATEAU
+
+def lire_coords(jetons, message):
+    """
+    Q29) Demande au joueur des coordonnées de départ.
+    Utilisation du nettoyeur manuel pour l'entrée.
+    """
+    print(message)
+    while True:
+        saisie_lig_brut = input("Ligne (1-15, ou A pour annuler) : ")
+        saisie_lig = convert_str_maj_epspace(saisie_lig_brut)
+        
+        if saisie_lig == 'A':
+            return -1, -1
+        
+        try:
+            lig = int(saisie_lig) - 1 # Conversion en index 0-basé
+            
+            saisie_col_brut = input("Colonne (1-15) : ")
+            col_nettoyee = convert_str_maj_epspace(saisie_col_brut)
+            col = int(col_nettoyee) - 1 # Conversion en index 0-basé
+            
+            if not est_sur_plateau(lig, col):
+                print("Coordonnées hors limites (1-15). Réessayez.")
+                continue
+                
+            return lig, col
+            
+        except ValueError:
+            print("Entrée invalide. Les coordonnées doivent être des nombres (ou 'A'). Réessayez.")
+
+def lire_direction():
+    """Q34 (Auxiliaire) : Demande la direction H (Horizontal) ou V (Vertical)."""
+    while True:
+        dir_input_brut = input("Direction (H pour Horizontal, V pour Vertical) : ")
+        dir_maj = convert_str_maj_epspace(dir_input_brut)
+
+        if dir_maj in ['H', 'V']:
+            return dir_maj
+        else:
+            print("Direction invalide. Réessayez.")
+
+def tester_placement(plateau, i, j, direction, mot):
+    """
+    Q30) Vérifie si le mot est plaçable à (i, j) et retourne les lettres nécessaires de la main.
+    Retourne la liste des lettres nécessaires, ou [] si impossible.
+    """
+    lig = i
+    col = j
+    longueur_mot = len(mot)
+    lettres_necessaires = []
+    
+    # --- Vérification des limites du plateau ---
+    if direction == 'H':
+        if col + longueur_mot > TAILLE_PLATEAU:
+            return [] 
+    elif direction == 'V':
+        if lig + longueur_mot > TAILLE_PLATEAU:
+            return [] 
+
+    # --- Vérification de la compatibilité et collecte des lettres nécessaires ---
+    k = 0
+    while k < longueur_mot:
+        lettre_plateau = plateau[lig][col]
+        lettre_mot = mot[k]
+        
+        if lettre_plateau != '':
+            if lettre_plateau != lettre_mot:
+                return [] # Conflit avec une lettre existante
+        else:
+            lettres_necessaires.append(lettre_mot)
+            
+        # Avancer d'une case
+        if direction == 'H':
+            col += 1
+        elif direction == 'V':
+            lig += 1
+        k += 1
+        
+    return lettres_necessaires
+
+def placer_mot(plateau, main, mot, i, j, direction, lettres_requises):
+    """
+    Q31) Place le mot sur le plateau et consomme les jetons de la main.
+    Modifie le plateau et la main.
+    """
+    # 1. Consommer les jetons de la main
+    consommateur_de_lettres("".join(lettres_requises), main) 
+    
+    # 2. Placer les lettres sur le plateau
+    lig = i
+    col = j
+    for k in range(len(mot)):
+        if plateau[lig][col] == '':
+            plateau[lig][col] = mot[k] # Placer si la case était vide
+            
+        if direction == 'H':
+            col += 1
+        elif direction == 'V':
+            lig += 1
+        
+    return True
+
+def calculer_score_placement(mot, i, j, direction, dico, bonus, lettres_jouees):
+    """
+    Q32) Calcule la valeur d'un mot en tenant compte des bonus de cases.
+    Retourne (score, liste_coords_bonus_utilisés_dans_ce_coup)
+    """
+    score_base = 0
+    multiplicateur_mot = 1
+    longueur_mot = len(mot)
+    
+    lig = i
+    col = j
+    
+    # Stocke les coordonnées des cases bonus sur lesquelles le joueur pose un jeton
+    coords_bonus_utilises = []
+    
+    k = 0
+    while k < longueur_mot:
+        lettre = mot[k]
+        valeur_lettre = 0
+        
+        if lettre in dico: # Accès conforme
+            valeur_lettre = dico[lettre]['val']
+            
+        bonus_case = bonus[lig][col]
+        score_lettre = valeur_lettre
+        
+        # Appliquer les multiplicateurs de LETTRE et ajouter aux coordonnées à désactiver
+        if bonus_case == 'LD':
+            score_lettre *= 2
+            coords_bonus_utilises.append((lig, col))
+        elif bonus_case == 'LT':
+            score_lettre *= 3
+            coords_bonus_utilises.append((lig, col))
+            
+        score_base += score_lettre
+        
+        # Accumuler les multiplicateurs de MOT et ajouter aux coordonnées à désactiver
+        if bonus_case == 'MD':
+            multiplicateur_mot *= 2
+            coords_bonus_utilises.append((lig, col))
+        elif bonus_case == 'MT':
+            multiplicateur_mot *= 3
+            coords_bonus_utilises.append((lig, col))
+            
+        # Avancer
+        if direction == 'H':
+            col += 1
+        elif direction == 'V':
+            lig += 1
+        k += 1
+        
+    total_score = score_base * multiplicateur_mot
+    
+    # Bonus Scrabble (Q22/Q32)
+    if lettres_jouees == 7: 
+        total_score += 50
+        
+    return total_score, coords_bonus_utilises
+
+def desactiver_bonus(bonus, i, j):
+    """Q32 (Auxiliaire) : Désactive le bonus à la position (i, j) en le remplaçant par une chaîne vide."""
+    if bonus[i][j] != '':
+        print("INFO: Bonus", bonus[i][j], "à (", i+1, ",", j+1, ") désactivé.")
+        bonus[i][j] = ''
+    return
+
+def tour_joueur_complet(nom, main, sac, jetons, bonus, motsfr, dico):
+    """
+    Q34) Gère un tour de joueur avec placement sur le plateau (intégration Q29-Q32).
+    Retourne (score_delta, fin_partie_bool).
+    """
+    print("\n===== Tour de", nom, "=====")
+    affiche_jetons_avec_bonus(jetons, bonus) 
+    afficher_main(main)
+
+    # Choix
+    print("Choix : [P]asser / [E]changer / [J]ouer un mot sur le plateau")
+    choix_input_brut = input("Votre choix (P/E/J) : ")
+    
+    # Conversion manuelle du choix
+    choix = convert_str_maj_epspace(choix_input_brut)
+    
+    while choix not in ["P", "E", "J"]:
+        choix_input_brut = input("Votre choix (P/E/J) : ")
+        choix = convert_str_maj_epspace(choix_input_brut)
+
+    # Passer (P)
+    if choix == "P":
+        print("->", nom, "passe son tour.")
+        return 0, False
+
+    # Échanger (E)
+    if choix == "E":
+        if len(sac) == 0:
+            print("-> Sac vide : échange impossible.")
+            return 0, False
+        
+        s = input("Liste des lettres à échanger (sans séparateur, ex: AEI) : ")
+        
+        # Conversion manuelle de la liste de lettres à échanger
+        to_swap_str = convert_str_maj_epspace(s)
+        to_swap = list(to_swap_str) # Conversion en liste de jetons
+
+        ok = echanger(to_swap, main, sac)
+        if ok:
+            print("Échange réussi.")
+            afficher_main(main)
+        else:
+            print("Échange impossible (lettre(s) absente(s) ou sac insuffisant).")
+        return 0, False
+
+    # Jouer un mot (J) (Q34)
+    if choix == "J":
+        mot_input_brut = input("Mot proposé (majuscules, sans accents) : ")
+        mot = convert_str_maj_epspace(mot_input_brut)
+
+        # 1) vérifier qu'il est dans le dictionnaire français
+        if mot not in motsfr:
+            print("Mot non autorisé (absent du dictionnaire).")
+            return 0, False
+
+        # 2) Lire les coordonnées (Q29)
+        lig, col = lire_coords(jetons, "Coordonnées de la première lettre du mot :")
+        if lig == -1: # Annulation par le joueur
+            print("Action annulée.")
+            return 0, False
+
+        direction = lire_direction()
+
+        # 3) Vérifier le placement et la jouabilité (Q30, Q31)
+        lettres_requises = tester_placement(jetons, lig, col, direction, mot)
+        
+        if not lettres_requises:
+            print("Placement impossible : débordement, ou conflit avec lettres existantes.")
+            return 0, False
+        
+        lettres_jouees = len(lettres_requises)
+        
+        # --- RÈGLE DU PREMIER COUP (CASE CENTRALE) ---
+        if plateau_est_vide(jetons):
+            centre_atteint = False
+            k = 0
+            while k < len(mot):
+                # Vérifie si le mot passe par la case (7, 7) (index 0-basé)
+                if (lig + (k if direction == 'V' else 0)) == 7 and (col + (k if direction == 'H' else 0)) == 7:
+                    centre_atteint = True
+                    break
+                k += 1
+            
+            if not centre_atteint:
+                print("Placement invalide : le premier mot doit passer par la case centrale (8, 8).")
+                return 0, False
+        # ---------------------------------------------
+        
+        # Vérifier si le joueur a les lettres nécessaires (sans .join)
+        chaine_requise = ""
+        for lettre in lettres_requises:
+            chaine_requise += lettre
+            
+        if not mot_jouable(chaine_requise, main):
+            print("Mot non jouable avec les lettres restantes dans votre main.")
+            return 0, False
+
+        # 4) Placer le mot, consommer les jetons, et calculer le score
+        
+        placer_mot(jetons, main, mot, lig, col, direction, lettres_requises) 
+        
+        # Récupération du score ET des coordonnées des bonus utilisés
+        val, coords_bonus_utilises = calculer_score_placement(mot, lig, col, direction, dico, bonus, lettres_jouees)
+        
+        # Désactivation des bonus
+        for coord in coords_bonus_utilises:
+            desactiver_bonus(bonus, coord[0], coord[1])
+        
+        # 5) Affichage et fin de tour (Q35)
+        print("Mot posé :", mot)
+        
+        print("\n--- PLATEAU MIS À JOUR ---")
+        affiche_jetons_avec_bonus(jetons, bonus)
+        
+        print("Valeur du mot :", val, "points")
+
+        # Détection de la fin de partie
+        if a_plus_assez_pour_completer(main, sac):
+            print("Fin de partie: sac insuffisant pour compléter la main. Partie terminée.")
+            return val, True
+
+        # sinon re-piocher pour revenir à 7
+        completer_main(main, sac)
+        afficher_main(main)
+        return val, False
+
+    return 0, False
+
+# PARTIE 7 : BONUS ET AMÉLIORATIONS ############################################
+
+def meilleure_aide_de_jeu(motsfr, main, dico):
+    """
+    Bonus Q23 (Aide de jeu simplifiée): Proposer le meilleur mot jouable avec les lettres en main.
+    """
+    meilleurs = meilleurs_mots(motsfr, main, dico)
+    
+    if not meilleurs:
+        print("Aide de jeu : Aucun mot jouable avec les lettres dans votre main.")
+        return
+        
+    meilleur_score = valeur_mot(meilleurs[0], dico)
+    
+    print("\n--- Aide de jeu : Meilleurs mots jouables avec la main ---")
+    print("Score maximum possible:", meilleur_score, "points.")
+    print("Mots trouvés (ex aequo):", meilleurs)
+
+
+# PROGRAMME PRINCIPAL (Q35) ####################################################
+
+if __name__ == '__main__':
+    
+    # --- Chargement et Initialisation (Q12, Q19) ---
+    dico = generer_dico()
+    motsfr = generer_dictfr(FICHIER_DICO_FR)
+    
+    if not dico or not motsfr:
+        print("\n*** Impossible de démarrer la partie sans les ressources (dictionnaires de mots et de jetons). ***")
+    else:
+        sac = init_pioche(dico) 
+        jetons = init_jetons()
+        bonus = init_bonus()
+        
+        print("\n==============================================")
+        print("=== DÉBUT DE LA PARTIE SIMULÉE (AVEC PLACEMENT) ===")
+        print("==============================================\n")
+
+        # --- Initialisation des joueurs ---
+        try:
+            nb_j_input = input("Nombre de joueurs (>=1) ? ")
+            nb_j_nettoye = convert_str_maj_epspace(nb_j_input)
+            nb_j = int(nb_j_nettoye)
+            while nb_j < 1:
+                nb_j_input = input("Nombre de joueurs doit être >= 1. Réessayez : ")
+                nb_j_nettoye = convert_str_maj_epspace(nb_j_input)
+                nb_j = int(nb_j_nettoye)
+        except:
+            nb_j = 1
+            print("Nombre de joueurs par défaut: ", 1) 
+
+        joueurs = []
+        n = 0
+        while n < nb_j:
+            nom_prompt = "Nom du joueur " + str(n+1) + " : "
+            nom_input = input(nom_prompt)
+            nom = convert_str_maj_epspace(nom_input)
+            
+            if nom == "":
+                nom = "J" + str(n+1)
+            
+            joueurs.append({"nom": nom, "score": 0, "main": []})
+            n += 1
+
+        for j in joueurs:
+            j["main"] = piocher(7, sac)
+
+        # --- Boucle de jeu (Q35) ---
+        joueur_courant = 0
+        fin = False
+        
+        while not fin:
+            j = joueurs[joueur_courant]
+            
+            # --- Bonus de la Partie 7 (Aide de jeu) ---
+            aide_input = input("\nSouhaitez-vous une aide de jeu (Y/N) ? ")
+            if convert_str_maj_epspace(aide_input) == 'Y':
+                meilleure_aide_de_jeu(motsfr, j["main"], dico)
+            # ---------------------------------------------------
+
+            print("\n-------------------------------")
+            print("Scores actuels :")
+            for joueur in joueurs:
+                print(" - ", joueur['nom'], ":", joueur['score'])
+
+            # Tour de jeu AVEC placement (Q34/Q35)
+            delta, fin = tour_joueur_complet(j["nom"], j["main"], sac, jetons, bonus, motsfr, dico)
+            j["score"] += delta
+
+            # Gestion de la fin de partie (Q26, Q28)
+            if fin:
+                print("\n=== Fin de partie (sac vide ou insuffisant) ===")
+                for t, joueur in enumerate(joueurs):
+                    if t != joueur_courant:
+                        mal = malus_main(joueur["main"], dico)
+                        joueur["score"] -= mal
+                        print(joueur['nom'], " perd ", mal, " points (lettres restantes)")
+                break
+
+            joueur_courant = prochain_joueur_index(joueur_courant, nb_j)
+
+        # --- Résultats finaux (Q28) ---
+        print("\n=== Scores finaux ===")
+        meilleur_nom = ""
+        meilleur_sc = -999999
+        
+        for joueur in joueurs:
+            print(joueur['nom'], ":", joueur['score'])
+            if joueur["score"] > meilleur_sc:
+                meilleur_sc = joueur["score"]
+                meilleur_nom = joueur["nom"
+                
+        print("\n🏆 Gagnant :", meilleur_nom, "avec", meilleur_sc, "points.")
