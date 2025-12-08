@@ -238,6 +238,37 @@ def affiche_jetons_avec_bonus(jetons, bonus):
 
 # PARTIE 2 : PIOCHE ############################################################
 
+def init_pioche_alea():
+    """
+    Q7) Génère une liste de 100 lettres majuscules aléatoires + 2 jokers.
+    Assure que chaque lettre est présente au moins une fois.
+    """
+    pioche = []
+    
+    # 1. On assure la présence de chaque lettre (A-Z)
+    # Le code ASCII de 'A' est 65, celui de 'Z' est 90
+    code = 65
+    while code <= 90:
+        pioche.append(chr(code))
+        code += 1
+        
+    # 2. On ajoute les 2 jokers
+    pioche.append(JOKER)
+    pioche.append(JOKER)
+    
+    # À ce stade, on a 26 lettres + 2 jokers = 28 jetons.
+    # On veut 102 jetons au total (100 lettres + 2 jokers).
+    # Il faut donc ajouter 102 - 28 = 74 lettres aléatoires supplémentaires.
+    i = 0
+    while i < 74:
+        code_hasard = random.randint(65, 90) # Entre 65 ('A') et 90 ('Z') inclus
+        pioche.append(chr(code_hasard))
+        i += 1
+        
+    # On mélange le tout
+    random.shuffle(pioche)
+    return pioche
+
 def piocher(x, sac):
     """
     Q8) Pioche x jetons au hasard.
