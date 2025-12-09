@@ -519,52 +519,115 @@ def meilleurs_mots(motsfr, ll, dico):
 
 # PARTIE 5 : GESTION DU JEU TEXTE (Q25 à Q28) ##################################
 
-def consommateur_de_lettres(mot, main):
+def tour_joueur(nom, main, sac, motsfr, dico, jetons, bonus):
     """
-    Q23 (utilitaire) : Retire les lettres du mot de la main du joueur.
-    Gère les doublons et les jokers manuellement.
+    Q25) Gère un tour de joueur
+    Affiche le plateau (Q4) mais ne permet pas d'y jouer.
     """
-    
-    # 1. On compte ce qu'on a dans la main
-    compteur_tmp = {}
-    for jeton in main:
-        if jeton in compteur_tmp:
-            compteur_tmp[jeton] += 1
-        else:
-            compteur_tmp[jeton] = 1
-    
-    # 2. Vérification de sécurité (normalement déjà fait par mot_jouable)
-    verif_compteur = dict(compteur_tmp) 
-    for ch in mot:
-        if ch in verif_compteur and verif_compteur[ch] > 0:
-            verif_compteur[ch] -= 1
-        elif JOKER in verif_compteur and verif_compteur[JOKER] > 0:
-            verif_compteur[JOKER] -= 1
-        else:
-            return False # Impossible de consommer
+    print("\n===== Tour de", nom, "=====")
+    # --- AFFICHAGE PLATEAU AJOUTÉ ---
+    affiche_jetons_avec_bonus(jetons, bonus)
+    # --------------------------------
+    afficher_main(main)
 
-    # 3. Consommation réelle
-    main_mise_a_jour = []
+    # Choix
+    print("Choix : [P]asser / [E]changer / proposer un [M]ot")
+    choix_input_brut = input("Votre choix (P/E/M) : ")
+    choix = convert_str_maj_epspace(choix_input_brut)
     
-    # On reprend le compteur initial
-    compteur_a_conserver = dict(compteur_tmp)
-    # On décrémente pour chaque lettre du mot
-    for ch in mot:
-        if ch in compteur_a_conserver and compteur_a_conserver[ch] > 0:
-            compteur_a_conserver[ch] -= 1
-        elif JOKER in compteur_a_conserver and compteur_a_conserver[JOKER] > 0:
-            compteur_a_conserver[JOKER] -= 1
-            
-    # On reconstruit la liste main
-    for jeton, count in compteur_a_conserver.items():
-        i = 0
-        while i < count:
-            main_mise_a_jour.append(jeton)
-            i += 1
-            
-    # Mise à jour de la liste main par référence
-    main[:] = main_mise_a_jour
-    return True
+    while choix not in ["P", "E", "M"]:
+        choix_input_brut = input("Votre choix (P/E/M) : ")
+        choix = convert_str_maj_epspace(choix_input_brut)
+
+    # Passer (P)
+    if choix == "P":
+        print("->", nom, "passe son tour.")
+        return 0, False
+
+    # Échanger (E)
+    if choix == "E":
+        if len(sac) == 0:
+            print("-> Sac vide : échange impossible.")
+            return 0, False
+        
+        s = input("Liste des lettres à échanger (sans séparateur, ex: AEI) : ")
+        to_swap_str = convert_str_maj_epspace(s)
+        to_swap = list(to_swap_str)
+
+        ok = echanger(to_swap, main, sac)
+        if ok:
+            print("Échange réussi.")
+            afficher_main(main)
+        else:
+            print("Échange impossible (lettre(s) absente(s) ou sac insuffisant).")
+        return 0, False
+
+    # Proposer un mot (M)
+    if choix == "M":
+        mot_input_brut = input("Mot proposé (majuscules, sans accents) : ")
+        mot = convert_str_maj_epspace(mot_input_brut)
+
+        # 1) vérifier
+        if mot not in motsfr:
+            print("Mot non autorisé (absent du dictionnaire).")
+            return 0, False
+
+        # 2) jouable ?
+        if not mot_jouable(mot, main):
+            print("Mot non jouable avec votre main.")
+            return 0, False
+
+        # 3) valeur
+        val = valeur_mot(mot, dico)
+        print("Valeur du mot:", mot, "=", val, "points")
+
+        # 4) défausser les lettres (Code de la fonction utilitaire INTÉGRÉ ICI)
+        # -------------------------------------------------------------
+        # Début du code de suppression des lettres
+        compteur_tmp = {}
+        for jeton in main:
+            if jeton in compteur_tmp:
+                compteur_tmp[jeton] += 1
+            else:
+                compteur_tmp[jeton] = 1
+        
+        verif_compteur = dict(compteur_tmp) 
+        for ch in mot:
+            if ch in verif_compteur and verif_compteur[ch] > 0:
+                verif_compteur[ch] -= 1
+            elif JOKER in verif_compteur and verif_compteur[JOKER] > 0:
+                verif_compteur[JOKER] -= 1
+    
+        main_mise_a_jour = []
+        compteur_a_conserver = dict(compteur_tmp)
+        for ch in mot:
+            if ch in compteur_a_conserver and compteur_a_conserver[ch] > 0:
+                compteur_a_conserver[ch] -= 1
+            elif JOKER in compteur_a_conserver and compteur_a_conserver[JOKER] > 0:
+                compteur_a_conserver[JOKER] -= 1
+                
+        for jeton in compteur_a_conserver:
+            count = compteur_a_conserver[jeton]
+            i = 0
+            while i < count:
+                main_mise_a_jour.append(jeton)
+                i += 1
+                
+        main[:] = main_mise_a_jour
+        # Fin du code de suppression
+        # -------------------------------------------------------------
+
+        # Fin ?
+        if detection_fin(main, sac):
+            print("Fin de partie: sac insuffisant pour compléter la main. Partie terminée.")
+            return val, True
+
+        # piocher
+        completer_main(main, sac)
+        afficher_main(main)
+        return val, False
+
+    return 0, False
 
 def detection_fin(main, sac):
     """Q26) Vérifie s'il reste assez de jetons dans le sac pour compléter la main à 7."""
@@ -588,87 +651,6 @@ def malus_main(main, dico):
         else:
             total += 0
     return total
-
-def tour_joueur(nom, main, sac, motsfr, dico, jetons, bonus):
-    """
-    Q25) Gère le tour d'un joueur en mode simplifié.
-    Affiche la grille (pour l'aspect visuel) mais le placement de mot
-    ne se fait pas sur la grille (juste vérification dictionnaire).
-    """
-    print("\n===== Tour de", nom, "=====")
-    
-    # --- AFFICHAGE PLATEAU (Q4) ---
-    affiche_jetons_avec_bonus(jetons, bonus)
-    # ------------------------------
-    
-    afficher_main(main)
-
-    # Menu de choix
-    print("Choix : [P]asser / [E]changer / proposer un [M]ot")
-    choix_input_brut = input("Votre choix (P/E/M) : ")
-    choix = convert_str_maj_epspace(choix_input_brut)
-    
-    # Boucle de validation du choix
-    while choix not in ["P", "E", "M"]:
-        choix_input_brut = input("Votre choix (P/E/M) : ")
-        choix = convert_str_maj_epspace(choix_input_brut)
-
-    # --- OPTION 1 : PASSER ---
-    if choix == "P":
-        print("->", nom, "passe son tour.")
-        return 0, False
-
-    # --- OPTION 2 : ECHANGER ---
-    if choix == "E":
-        if len(sac) == 0:
-            print("-> Sac vide : échange impossible.")
-            return 0, False
-        
-        s = input("Liste des lettres à échanger (sans séparateur, ex: AEI) : ")
-        to_swap_str = convert_str_maj_epspace(s)
-        to_swap = list(to_swap_str) # Conversion chaîne -> liste
-
-        ok = echanger(to_swap, main, sac)
-        if ok:
-            print("Échange réussi.")
-            afficher_main(main)
-        else:
-            print("Échange impossible (lettre(s) absente(s) ou sac insuffisant).")
-        return 0, False
-
-    # --- OPTION 3 : MOT ---
-    if choix == "M":
-        mot_input_brut = input("Mot proposé (majuscules, sans accents) : ")
-        mot = convert_str_maj_epspace(mot_input_brut)
-
-        # 1. Vérification dictionnaire
-        if mot not in motsfr:
-            print("Mot non autorisé (absent du dictionnaire).")
-            return 0, False
-
-        # 2. Vérification faisabilité avec la main
-        if not mot_jouable(mot, main):
-            print("Mot non jouable avec votre main.")
-            return 0, False
-
-        # 3. Calcul du score (hors plateau)
-        val = valeur_mot(mot, dico)
-        print("Valeur du mot:", mot, "=", val, "points")
-
-        # 4. Retrait des lettres jouées
-        consommateur_de_lettres(mot, main)
-
-        # 5. Vérification fin de partie (sac vide et main incomplète)
-        if a_plus_assez_pour_completer(main, sac):
-            print("Fin de partie: sac insuffisant pour compléter la main.")
-            return val, True
-
-        # 6. Compléter la main
-        completer_main(main, sac)
-        afficher_main(main)
-        return val, False
-
-    return 0, False
 
 
 # PARTIE 7 : BONUS ET AMÉLIORATIONS ############################################
@@ -694,7 +676,7 @@ def meilleure_aide_de_jeu(motsfr, main, dico):
 
 if __name__ == '__main__':
     
-    # --- 1. Chargement des ressources ---
+    # --- Chargement et Initialisation (Q12, Q19) ---
     dico = generer_dico()
     motsfr = generer_dictfr(FICHIER_DICO_FR)
     
@@ -710,18 +692,33 @@ if __name__ == '__main__':
         print("============= DÉBUT DE LA PARTIE ==============")
         print("==============================================\n")
 
-        # --- 3. Configuration des joueurs ---
-        try:
+        # --- 3. Configuration des joueurs (SANS TRY/EXCEPT) ---
+        nb_j = 0
+        while nb_j < 1:
             nb_j_input = input("Nombre de joueurs (>=1) ? ")
             nb_j_nouv = convert_str_maj_epspace(nb_j_input)
-            nb_j = int(nb_j_nettoye)
-            while nb_j < 1:
-                nb_j_input = input("Nombre de joueurs doit être >= 1. Réessayez : ")
-                nb_j_nouv = convert_str_maj_epspace(nb_j_input)
-                nb_j = int(nb_j_nettoye)
-        except:
-            nb_j = 1
-            print("Nombre de joueurs par défaut: ", 1) 
+            
+            # Vérification manuelle que c'est un nombre (remplace .isdigit())
+            est_numerique = True
+            if len(nb_j_nouv) == 0:
+                est_numerique = False
+            
+            i = 0
+            while i < len(nb_j_nouv):
+                c = nb_j_nouv[i]
+                # Vérifie si le caractère est entre '0' (48) et '9' (57)
+                if ord(c) < 48 or ord(c) > 57:
+                    est_numerique = False
+                i += 1
+            
+            if est_numerique:
+                # C'est sûr que c'est un nombre, on peut convertir sans erreur
+                nb_j = int(nb_j_nouv)
+                if nb_j < 1:
+                    print("Erreur : Il faut au moins 1 joueur.")
+            else:
+                print("Erreur : Veuillez entrer un chiffre valide.")
+                nb_j = 0 # On force à rester dans la boucle
 
         joueurs = []
         n = 0
